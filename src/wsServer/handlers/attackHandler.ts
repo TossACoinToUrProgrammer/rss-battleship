@@ -1,6 +1,7 @@
 import { gameController } from "../gameController"
 import { attackRes } from "../responses/attackRes"
 import { finishRes } from "../responses/finishRes"
+import { updateWinnersRes } from "../responses/updateWinnersRes"
 import { WsMessageTypes } from "../types"
 import { stringifyRes } from "../utils/stringifyRes"
 
@@ -14,6 +15,7 @@ export const attackHandler = (gameId: number, playerIndex: number, position?: { 
 
   if (!result) return
 
+  let gameOver = false
   game.players.forEach((player) => {
     if (result.status === "killed") {
       result.positions!.forEach((pos) => {
@@ -26,12 +28,12 @@ export const attackHandler = (gameId: number, playerIndex: number, position?: { 
     const opponent = game.players.find(({ index }) => index !== playerIndex)!
     if (opponent.ships?.every((ship) => ship.health === 0)) {
       //if all opponents ships are destroyed: send responses, remove players from game
-
       if (player.index === playerIndex) {
         gameController.users[player.ws.id].wins++
       }
-      game.players = game.players.filter((el) => el.index !== player.index)
+      gameOver = true
       player.ws.send(finishRes(playerIndex))
+      game.players = game.players.filter((el) => el.index !== player.index)
     } else {
       player.ws.send(
         stringifyRes({
@@ -44,4 +46,8 @@ export const attackHandler = (gameId: number, playerIndex: number, position?: { 
       )
     }
   })
+
+  if (gameOver) {
+    gameController.users.forEach((user) => user.ws.send(updateWinnersRes()))
+  }
 }
